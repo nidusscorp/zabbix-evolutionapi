@@ -1,0 +1,72 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  templates:
+    - uuid: 55169d91aaa0460895233f0293ee9591
+      template: EvolutionAPI
+      name: EvolutionAPI
+      groups:
+        - name: Templates
+      items:
+        - uuid: e3e0216343f543bfbfef2bb7de29f30e
+          name: 'get instances'
+          type: HTTP_AGENT
+          key: evolutionapi.get.instances
+          value_type: TEXT
+          trends: '0'
+          url: '{$EVOLUTIONAPI_URL}/instance/fetchInstances'
+          headers:
+            - name: apikey
+              value: '{$EVOLUTIONAPI_TOKEN}'
+      discovery_rules:
+        - uuid: 4fc61249297b447682de6442a1b144fe
+          name: 'instances discovery'
+          type: DEPENDENT
+          key: evolutionapi.discovery.instances
+          delay: '0'
+          item_prototypes:
+            - uuid: cad72e28905643f7975f4af697ab8ccf
+              name: 'instance {#NAME} : status'
+              type: DEPENDENT
+              key: 'evolutionapi.status[{#NAME}]'
+              delay: '0'
+              value_type: CHAR
+              trends: '0'
+              preprocessing:
+                - type: CHECK_NOT_SUPPORTED
+                  parameters:
+                    - '-1'
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: unknown
+                - type: JSONPATH
+                  parameters:
+                    - '$[?(@.name == ''{#NAME}'')].connectionStatus.first()'
+                - type: DISCARD_UNCHANGED
+                  parameters:
+                    - ''
+              master_item:
+                key: evolutionapi.get.instances
+              trigger_prototypes:
+                - uuid: 51b00f9e60294a4ba24b5c56464fe2f3
+                  expression: 'last(/EvolutionAPI/evolutionapi.status[{#NAME}])<>"open"'
+                  name: 'instance status {#NAME} is disconnected'
+                  priority: HIGH
+                  description: 'Phone number disconnected from evolutionapi'
+                  manual_close: 'YES'
+          master_item:
+            key: evolutionapi.get.instances
+          lld_macro_paths:
+            - lld_macro: '{#ID}'
+              path: $.id
+            - lld_macro: '{#NAME}'
+              path: $.name
+            - lld_macro: '{#STATUS}'
+              path: $.connectionStatus
+      tags:
+        - tag: app
+          value: evolutionapi
+      macros:
+        - macro: '{$EVOLUTIONAPI_TOKEN}'
+        - macro: '{$EVOLUTIONAPI_URL}'
